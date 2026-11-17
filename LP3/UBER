@@ -1,0 +1,159 @@
+
+# Uber Ride Fare Prediction using Linear Regression
+# and Random Forest Regression
+
+# Step 1: Import required libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+
+# Step 2: Load the dataset
+df = pd.read_csv("uber.csv")
+
+# Step 3: Pre-process the dataset
+print("First five rows:")
+print(df.head())
+
+print("\nDataset Information:")
+print(df.info())
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# Remove missing values
+df = df.dropna()
+
+# Remove unnecessary column
+if 'Unnamed: 0' in df.columns:
+    df = df.drop('Unnamed: 0', axis=1)
+
+# Convert pickup_datetime into datetime format
+df['pickup_datetime'] = pd.to_datetime(
+    df['pickup_datetime']
+)
+
+# Extract useful date and time features
+df['hour'] = df['pickup_datetime'].dt.hour
+df['day'] = df['pickup_datetime'].dt.day
+df['month'] = df['pickup_datetime'].dt.month
+df['year'] = df['pickup_datetime'].dt.year
+
+# Drop original datetime column
+df = df.drop('pickup_datetime', axis=1)
+
+# Remove invalid fare and passenger values
+df = df[(df['fare_amount'] > 0) & 
+        (df['passenger_count'] > 0)]
+
+print("\nDataset after preprocessing:")
+print(df.head())
+
+
+# Step 4: Identify and remove outliers using IQR
+Q1 = df['fare_amount'].quantile(0.25)
+Q3 = df['fare_amount'].quantile(0.75)
+
+IQR = Q3 - Q1
+
+lower_limit = Q1 - 1.5 * IQR
+upper_limit = Q3 + 1.5 * IQR
+
+print("\nLower Limit:", lower_limit)
+print("Upper Limit:", upper_limit)
+
+# Identify outliers
+outliers = df[
+    (df['fare_amount'] < lower_limit) |
+    (df['fare_amount'] > upper_limit)
+]
+
+print("\nNumber of Outliers:", len(outliers))
+
+# Remove outliers
+df = df[
+    (df['fare_amount'] >= lower_limit) &
+    (df['fare_amount'] <= upper_limit)
+]
+
+
+# Step 5: Check correlation
+print("\nCorrelation Matrix:")
+print(df.corr(numeric_only=True))
+
+plt.figure(figsize=(10, 6))
+sns.heatmap(df.corr(numeric_only=True),
+            annot=True, cmap='coolwarm')
+
+plt.title("Correlation Heatmap")
+plt.show()
+
+
+# Step 6: Select features and target variable
+X = df.drop('fare_amount', axis=1)
+y = df['fare_amount']
+
+# Split dataset into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+
+# Step 7: Linear Regression Model
+lr_model = LinearRegression()
+
+lr_model.fit(X_train, y_train)
+
+lr_pred = lr_model.predict(X_test)
+
+lr_r2 = r2_score(y_test, lr_pred)
+lr_rmse = np.sqrt(mean_squared_error(y_test, lr_pred))
+lr_mae = mean_absolute_error(y_test, lr_pred)
+
+print("\n--- Linear Regression Results ---")
+print("R2 Score:", lr_r2)
+print("RMSE:", lr_rmse)
+print("MAE:", lr_mae)
+
+
+# Step 8: Random Forest Regression Model
+rf_model = RandomForestRegressor(
+    n_estimators=100, random_state=42
+)
+
+rf_model.fit(X_train, y_train)
+
+rf_pred = rf_model.predict(X_test)
+
+rf_r2 = r2_score(y_test, rf_pred)
+rf_rmse = np.sqrt(mean_squared_error(y_test, rf_pred))
+rf_mae = mean_absolute_error(y_test, rf_pred)
+
+print("\n--- Random Forest Regression Results ---")
+print("R2 Score:", rf_r2)
+print("RMSE:", rf_rmse)
+print("MAE:", rf_mae)
+
+
+# Step 9: Compare both models
+results = pd.DataFrame({
+    'Model': ['Linear Regression', 'Random Forest'],
+    'R2 Score': [lr_r2, rf_r2],
+    'RMSE': [lr_rmse, rf_rmse],
+    'MAE': [lr_mae, rf_mae]
+})
+
+print("\n--- Model Comparison ---")
+print(results)
+
+# Step 10: Predict Uber fare
+sample = X_test.iloc[[0]]
+
+prediction = rf_model.predict(sample)
+
+print("\nPredicted Uber Fare:", prediction[0])
